@@ -4,6 +4,7 @@ import streamlit as st
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from review_scraper import fetch_reviews, ScrapeError
 
 st.set_page_config(page_title="Personalized Review Summarizer", page_icon="🛍️", layout="wide")
 ASPECTS = {
@@ -20,12 +21,12 @@ ASPECTS = {
 def analyzer():
     return SentimentIntensityAnalyzer()
 
-def load_data(file):
-    data = pd.read_csv(file) if file else pd.read_csv("dataset/product_reviews.csv")
-    required = {"product_id", "review_text", "rating"}
-    missing = required - set(data.columns)
-    if missing:
-        raise ValueError("CSV needs columns: product_id, review_text, rating")
+@st.cache_data(show_spinner="Fetching reviews from the product page...", ttl=3600)
+def scrape(url):
+    return fetch_reviews(url)
+
+def load_data(url):
+    data = scrape(url) if url else pd.read_csv("dataset/product_reviews.csv")
     data = data.dropna(subset=["product_id", "review_text"]).copy()
     data["product_id"] = data["product_id"].astype(str)
     data["review_text"] = data["review_text"].astype(str).str.strip()
@@ -70,18 +71,23 @@ with st.sidebar:
     preference = st.text_area("Your own priorities (optional)", placeholder="Example: I take photos and need long battery life.")
     count = st.slider("Review points per section", 2, 8, 4)
 
-upload = st.file_uploader("Upload another review CSV (optional)", type=["csv"])
+url = st.text_input("Product link", placeholder="Paste a product page URL to analyse its reviews (leave empty to use the sample dataset)").strip()
 try:
-    data = analyse(load_data(upload))
-except Exception as e:
+    data = analyse(load_data(url))
+except ScrapeError as e:
     st.error(str(e))
     st.stop()
+except Exception as e:
+    st.error(f"Something went wrong: {e}")
+    st.stop()
+if url:
+    st.success(f"Loaded {len(data)} reviews from the link.")
+else:
+    st.caption("Showing the built-in sample dataset. Paste a product link above to analyse real reviews.")
 if data.empty:
     st.warning("No valid review rows found.")
     st.stop()
 
-product = st.selectbox("Product", sorted(data.product_id.unique()))
-data = data[data.product_id == product]
 a, b, c, d = st.columns(4)
 a.metric("Reviews", len(data))
 b.metric("Average rating", f"{data.rating.mean():.1f}/5")
@@ -111,4 +117,6 @@ if aspect != "All": view = view[view.aspects.apply(lambda x: aspect in x)]
 if sent != "All": view = view[view.sentiment == sent]
 st.dataframe(view[["review_text", "rating", "sentiment", "aspects"]], use_container_width=True, hide_index=True)
 st.download_button("Download analysed reviews", view[["product_id", "review_text", "rating", "sentiment"]].to_csv(index=False), "analysed_reviews.csv", "text/csv")
-st.caption("Starter prototype: VADER estimates sentiment, keyword rules detect aspects, and TF-IDF ranks reviews against your preferences. The included reviews are synthetic examples, not real customer feedback.")
+st.caption("Starter prototype: VADER estimates sentiment, keyword rules detect aspects, and TF-IDF ranks reviews against your preferences. "
+           + ("Reviews were fetched live from the link you provided; verify insights against the original page." if url
+              else "The included reviews are synthetic examples, not real customer feedback."))
