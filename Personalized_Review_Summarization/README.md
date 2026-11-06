@@ -8,7 +8,8 @@ A beginner-friendly Python AI/NLP prototype that analyses product reviews and hi
 - Estimates positive, neutral, and negative sentiment using VADER.
 - Uses TF-IDF and cosine similarity to rank reviews against the selected preferences.
 - Shows positive points and customer concerns separately.
-- Supports uploading another CSV and downloading analysed reviews.
+- Paste a **Flipkart** product link to analyse its live reviews (top reviews plus negative-first, up to 50). Other sites work only if their HTML includes schema.org review data.
+- Download analysed reviews as CSV.
 
 ## Dataset
 `dataset/product_reviews.csv` has 100 synthetic sample reviews and these required columns:
