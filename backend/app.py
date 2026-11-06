@@ -157,3 +157,7 @@ def analyze_reviews(payload: AnalyzeRequest):
         data_source=data_source
     )
 
+
+@app.get("/")
+def read_root():
+    return {"message": "Personalized AI Review Summarizer API is running"}
